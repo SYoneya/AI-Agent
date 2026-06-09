@@ -80,6 +80,7 @@ async def create_tables():
                 surname TEXT,
                 phone TEXT,
                 email TEXT,
+                language TEXT,
                 wsg_status TEXT,
                 status TEXT DEFAULT 'new',
                 is_admin INTEGER DEFAULT 0,
@@ -144,6 +145,7 @@ async def create_tables():
             {
                 "phone": "TEXT",
                 "email": "TEXT",
+                "language": "TEXT",
                 "wsg_status": "TEXT",
                 "status": "TEXT DEFAULT 'new'",
                 "is_admin": "INTEGER DEFAULT 0",
@@ -221,6 +223,19 @@ async def add_user(telegram_id, name=None):
             VALUES (?, ?, 'new')
             """,
             (telegram_id, name),
+        )
+        await db.commit()
+
+
+async def set_user_language(telegram_id, language):
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute(
+            """
+            UPDATE users
+            SET language = ?
+            WHERE telegram_id = ?
+            """,
+            (language, telegram_id),
         )
         await db.commit()
 

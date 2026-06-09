@@ -19,37 +19,114 @@ from database.db import (
     get_user_by_telegram_id,
     is_user_blocked,
 )
-from keyboards.user import REPORT_ISSUE_BUTTONS, build_main_menu, contacts_menu
+from keyboards.user import (
+    REPORT_ISSUE_BUTTONS,
+    build_contacts_menu,
+    build_main_menu,
+)
+from locales import all_texts, language_from_user, t
 from states.issue import IssueForm
 
 router = Router()
 
-ISSUE_CATEGORIES = {
-    "electricity": "🔌 Електрика",
-    "water": "🚿 Водопостачання",
-    "heating": "🔥 Опалення",
-    "internet": "🛜 Інтернет",
-    "cleaning": "🧹 Прибирання",
-    "damage": "🪟 Пошкодження майна",
-    "other": "❓ Інше",
+ISSUE_CATEGORY_LABELS = {
+    "uk": {
+        "electricity": "🔌 Електрика",
+        "water": "🚿 Водопостачання",
+        "heating": "🔥 Опалення",
+        "internet": "🛜 Інтернет",
+        "cleaning": "🧹 Прибирання",
+        "damage": "🪟 Пошкодження майна",
+        "other": "❓ Інше",
+    },
+    "en": {
+        "electricity": "🔌 Electricity",
+        "water": "🚿 Water supply",
+        "heating": "🔥 Heating",
+        "internet": "🛜 Internet",
+        "cleaning": "🧹 Cleaning",
+        "damage": "🪟 Property damage",
+        "other": "❓ Other",
+    },
+    "pl": {
+        "electricity": "🔌 Elektryczność",
+        "water": "🚿 Woda",
+        "heating": "🔥 Ogrzewanie",
+        "internet": "🛜 Internet",
+        "cleaning": "🧹 Sprzątanie",
+        "damage": "🪟 Uszkodzenie mienia",
+        "other": "❓ Inne",
+    },
 }
 
-SKIP_PHOTO_TEXT = "Пропустити фото"
+ISSUE_TEXTS = {
+    "uk": {
+        "blocked": "🚫 Ваш акаунт заблоковано. Створення заявок недоступне.",
+        "choose_dorm": "Який гуртожиток?",
+        "dorm_not_found": "Гуртожиток не знайдено.",
+        "choose_category": "Гуртожиток: {dormitory}\n\nОберіть тип проблеми:",
+        "category_not_found": "Категорію не знайдено.",
+        "describe": "Категорія: {category}\n\nОпишіть проблему:",
+        "describe_more": "Опишіть проблему трохи детальніше:",
+        "add_photo": "Додайте фото проблеми або натисніть «Пропустити фото».",
+        "send_photo": "Надішліть фото або натисніть «Пропустити фото».",
+        "created": "✅ Заявка #{id} створена.\nСтатус: 🟡 Нова",
+        "thanks": "Дякуємо, адміністрація отримає повідомлення.",
+    },
+    "en": {
+        "blocked": "🚫 Your account is blocked. Creating requests is unavailable.",
+        "choose_dorm": "Which dormitory?",
+        "dorm_not_found": "Dormitory not found.",
+        "choose_category": "Dormitory: {dormitory}\n\nChoose the problem type:",
+        "category_not_found": "Category not found.",
+        "describe": "Category: {category}\n\nDescribe the problem:",
+        "describe_more": "Describe the problem in a little more detail:",
+        "add_photo": "Add a photo of the problem or tap “Skip photo”.",
+        "send_photo": "Send a photo or tap “Skip photo”.",
+        "created": "✅ Request #{id} created.\nStatus: 🟡 New",
+        "thanks": "Thank you, the administration will receive a notification.",
+    },
+    "pl": {
+        "blocked": "🚫 Twoje konto jest zablokowane. Tworzenie zgłoszeń jest niedostępne.",
+        "choose_dorm": "Który akademik?",
+        "dorm_not_found": "Nie znaleziono akademika.",
+        "choose_category": "Akademik: {dormitory}\n\nWybierz typ problemu:",
+        "category_not_found": "Nie znaleziono kategorii.",
+        "describe": "Kategoria: {category}\n\nOpisz problem:",
+        "describe_more": "Opisz problem trochę dokładniej:",
+        "add_photo": "Dodaj zdjęcie problemu albo kliknij „Pomiń zdjęcie”.",
+        "send_photo": "Wyślij zdjęcie albo kliknij „Pomiń zdjęcie”.",
+        "created": "✅ Zgłoszenie #{id} utworzone.\nStatus: 🟡 Nowe",
+        "thanks": "Dziękujemy, administracja otrzyma powiadomienie.",
+    },
+}
+
+SKIP_PHOTO_TEXTS = all_texts("btn_skip_photo")
+
+
+def it(language: str, key: str, **kwargs) -> str:
+    value = ISSUE_TEXTS.get(language, ISSUE_TEXTS["uk"]).get(key, ISSUE_TEXTS["uk"][key])
+    return value.format(**kwargs) if kwargs else value
+
+
+def category_label(language: str, key: str) -> str | None:
+    return ISSUE_CATEGORY_LABELS.get(language, ISSUE_CATEGORY_LABELS["uk"]).get(key)
 
 
 async def ensure_registered_message(message: Message) -> bool:
     user = await get_user_by_telegram_id(message.from_user.id)
+    language = language_from_user(user)
     if not user or user["status"] != "registered":
         await message.answer(
-            "Ця функція доступна після авторизації. Надішліть /start.",
-            reply_markup=contacts_menu,
+            t(language, "auth_required"),
+            reply_markup=build_contacts_menu(language),
         )
         return False
 
     if await is_user_blocked(message.from_user.id):
         await message.answer(
-            "🚫 Ваш акаунт заблоковано. Створення заявок недоступне.",
-            reply_markup=contacts_menu,
+            it(language, "blocked"),
+            reply_markup=build_contacts_menu(language),
         )
         return False
 
@@ -58,18 +135,13 @@ async def ensure_registered_message(message: Message) -> bool:
 
 async def ensure_registered_callback(callback: CallbackQuery) -> bool:
     user = await get_user_by_telegram_id(callback.from_user.id)
+    language = language_from_user(user)
     if not user or user["status"] != "registered":
-        await callback.answer(
-            "Ця функція доступна після авторизації. Надішліть /start.",
-            show_alert=True,
-        )
+        await callback.answer(t(language, "auth_required"), show_alert=True)
         return False
 
     if await is_user_blocked(callback.from_user.id):
-        await callback.answer(
-            "Ваш акаунт заблоковано. Створення заявок недоступне.",
-            show_alert=True,
-        )
+        await callback.answer(it(language, "blocked"), show_alert=True)
         return False
 
     return True
@@ -89,18 +161,18 @@ def dormitories_keyboard(dormitories) -> InlineKeyboardMarkup:
     )
 
 
-def categories_keyboard() -> InlineKeyboardMarkup:
+def categories_keyboard(language: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=label, callback_data=f"issue:cat:{key}")]
-            for key, label in ISSUE_CATEGORIES.items()
+            for key, label in ISSUE_CATEGORY_LABELS.get(language, ISSUE_CATEGORY_LABELS["uk"]).items()
         ]
     )
 
 
-def skip_photo_keyboard() -> ReplyKeyboardMarkup:
+def skip_photo_keyboard(language: str) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=SKIP_PHOTO_TEXT)]],
+        keyboard=[[KeyboardButton(text=t(language, "btn_skip_photo"))]],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
@@ -150,11 +222,13 @@ async def issue_start(message: Message, state: FSMContext):
     if not await ensure_registered_message(message):
         return
 
+    user = await get_user_by_telegram_id(message.from_user.id)
+    language = language_from_user(user)
     await state.clear()
     dormitories = await get_dormitories()
     await state.set_state(IssueForm.dormitory)
     await message.answer(
-        "Який гуртожиток?",
+        it(language, "choose_dorm"),
         reply_markup=dormitories_keyboard(dormitories),
     )
 
@@ -164,10 +238,12 @@ async def issue_get_dormitory(callback: CallbackQuery, state: FSMContext):
     if not await ensure_registered_callback(callback):
         return
 
+    user = await get_user_by_telegram_id(callback.from_user.id)
+    language = language_from_user(user)
     dormitory_id = int(callback.data.split(":")[2])
     dormitory = await get_dormitory_by_id(dormitory_id)
     if not dormitory:
-        await callback.answer("Гуртожиток не знайдено.", show_alert=True)
+        await callback.answer(it(language, "dorm_not_found"), show_alert=True)
         return
 
     await state.update_data(
@@ -176,57 +252,60 @@ async def issue_get_dormitory(callback: CallbackQuery, state: FSMContext):
     )
     await state.set_state(IssueForm.category)
     await callback.message.edit_text(
-        f"Гуртожиток: {dormitory['name']}\n\nОберіть тип проблеми:",
-        reply_markup=categories_keyboard(),
+        it(language, "choose_category", dormitory=dormitory["name"]),
+        reply_markup=categories_keyboard(language),
     )
     await callback.answer()
 
 
 @router.callback_query(IssueForm.category, F.data.startswith("issue:cat:"))
 async def issue_get_category(callback: CallbackQuery, state: FSMContext):
+    user = await get_user_by_telegram_id(callback.from_user.id)
+    language = language_from_user(user)
     category_key = callback.data.split(":")[2]
-    category = ISSUE_CATEGORIES.get(category_key)
+    category = category_label(language, category_key)
     if not category:
-        await callback.answer("Категорію не знайдено.", show_alert=True)
+        await callback.answer(it(language, "category_not_found"), show_alert=True)
         return
 
     await state.update_data(category=category)
     await state.set_state(IssueForm.description)
-    await callback.message.edit_text(
-        f"Категорія: {category}\n\nОпишіть проблему:"
-    )
+    await callback.message.edit_text(it(language, "describe", category=category))
     await callback.answer()
 
 
 @router.message(IssueForm.description, F.text)
 async def issue_get_description(message: Message, state: FSMContext):
+    user = await get_user_by_telegram_id(message.from_user.id)
+    language = language_from_user(user)
     description = message.text.strip()
     if len(description) < 5:
-        await message.answer("Опишіть проблему трохи детальніше:")
+        await message.answer(it(language, "describe_more"))
         return
 
     await state.update_data(description=description)
     await state.set_state(IssueForm.photo)
     await message.answer(
-        "Додайте фото проблеми або натисніть «Пропустити фото».",
-        reply_markup=skip_photo_keyboard(),
+        it(language, "add_photo"),
+        reply_markup=skip_photo_keyboard(language),
     )
 
 
 @router.message(IssueForm.photo)
 async def issue_get_photo(message: Message, state: FSMContext):
+    user = await get_user_by_telegram_id(message.from_user.id)
+    language = language_from_user(user)
     if message.photo:
         photo_file_id = message.photo[-1].file_id
-    elif message.text and message.text.strip() == SKIP_PHOTO_TEXT:
+    elif message.text and message.text.strip() in SKIP_PHOTO_TEXTS:
         photo_file_id = None
     else:
         await message.answer(
-            "Надішліть фото або натисніть «Пропустити фото».",
-            reply_markup=skip_photo_keyboard(),
+            it(language, "send_photo"),
+            reply_markup=skip_photo_keyboard(language),
         )
         return
 
-    user = await get_user_by_telegram_id(message.from_user.id)
     data = await state.get_data()
     issue_id = await add_issue(
         user["id"],
@@ -238,13 +317,14 @@ async def issue_get_photo(message: Message, state: FSMContext):
     await state.clear()
 
     await message.answer(
-        f"✅ Заявка #{issue_id} створена.\nСтатус: 🟡 Нова",
+        it(language, "created", id=issue_id),
         reply_markup=ReplyKeyboardRemove(),
     )
     await message.answer(
-        "Дякуємо, адміністрація отримає повідомлення.",
+        it(language, "thanks"),
         reply_markup=build_main_menu(
-            is_admin=bool(user["telegram_id"] in ADMIN_IDS or user["is_admin"])
+            language,
+            is_admin=bool(user["telegram_id"] in ADMIN_IDS or user["is_admin"]),
         ),
     )
     await notify_admins_about_issue(message.bot, issue_id)
