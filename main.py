@@ -11,6 +11,8 @@ from database.db import create_tables
 from handlers.admin import router as admin_router
 from handlers.dormitories import router as dorm_router
 from handlers.history import router as history_router
+from handlers.information import router as information_router
+from handlers.issues import router as issues_router
 from handlers.profile import router as profile_router
 from handlers.registration import router as registration_router
 from handlers.reservation import router as reservation_router
@@ -23,8 +25,10 @@ dp.include_router(start_router)
 dp.include_router(profile_router)
 dp.include_router(dorm_router)
 dp.include_router(reservation_router)
+dp.include_router(issues_router)
 dp.include_router(registration_router)
 dp.include_router(history_router)
+dp.include_router(information_router)
 dp.include_router(admin_router)
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -33,13 +37,13 @@ bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTM
 async def on_startup(bot: Bot):
     admin_target = ADMIN_IDS[0] if ADMIN_IDS else None
     if admin_target:
-        await bot.send_message(admin_target, "✅ Бот включен")
+        await bot.send_message(admin_target, "✅ Бот увімкнено")
 
 
 async def on_shutdown(bot: Bot):
     admin_target = ADMIN_IDS[0] if ADMIN_IDS else None
     if admin_target:
-        await bot.send_message(admin_target, "❌ Бот выключен")
+        await bot.send_message(admin_target, "❌ Бот вимкнено")
 
 
 async def main():

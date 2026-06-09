@@ -22,7 +22,7 @@ async def start_cmd(message: Message, state: FSMContext):
     if user and await is_user_blocked(message.from_user.id):
         await state.clear()
         await message.answer(
-            "🚫 Ваш аккаунт заблокирован. Обратитесь к администратору для разблокировки.",
+            "🚫 Ваш акаунт заблоковано. Зверніться до адміністрації.",
             reply_markup=contacts_menu,
         )
         return
@@ -30,16 +30,9 @@ async def start_cmd(message: Message, state: FSMContext):
     if user and user["status"] == "registered":
         await state.clear()
         await message.answer(
-            f"Привет, {message.from_user.first_name} 👋\nВы уже зарегистрированы.",
+            f"Вітаю, {user['name'] or message.from_user.first_name}! 👋\n"
+            "Оберіть дію в головному меню.",
             reply_markup=build_main_menu(is_admin=user_is_admin(user)),
-        )
-        return
-
-    if user and user["status"] == "pending":
-        await state.clear()
-        await message.answer(
-            "Ваша регистрация ожидает одобрения администратором.",
-            reply_markup=contacts_menu,
         )
         return
 
@@ -48,7 +41,9 @@ async def start_cmd(message: Message, state: FSMContext):
 
     await state.clear()
     await message.answer(
-        "👋 Добро пожаловать!\n\nВведите ваше имя:",
+        "👋 Вітаємо в боті гуртожитків WSG!\n\n"
+        "Для першого запуску потрібно пройти коротку авторизацію.\n"
+        "Введіть ваше ім'я:",
         reply_markup=contacts_menu,
     )
     await state.set_state(Registration.name)
